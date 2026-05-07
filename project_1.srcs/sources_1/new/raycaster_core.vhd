@@ -35,6 +35,7 @@ architecture rtl of raycaster_core is
 
   signal head_reg : heading_t := 0;
   signal col_reg : integer range 0 to SAMPLE_W - 1 := 0;
+  signal pos_phase_reg : integer range 0 to 7 := 0;
 
   signal tile_x_reg : integer := 0;
   signal tile_y_reg : integer := 0;
@@ -56,6 +57,7 @@ begin
     variable color_v : std_logic_vector(11 downto 0);
     variable map_px : integer;
     variable map_py : integer;
+    variable phase_accum : integer;
   begin
     if rising_edge(clk) then
       if rst = '1' then
@@ -75,6 +77,7 @@ begin
         wall_color <= x"444";
         busy <= '0';
         frame_done <= '0';
+        pos_phase_reg <= 0;
       else
         write_en <= '0';
         frame_done <= '0';
@@ -85,6 +88,11 @@ begin
             if start = '1' then
               head_reg <= wrap_heading(heading_idx);
               col_reg <= 0;
+              phase_accum := ((player_x_fp / 32) + (player_y_fp / 32)) mod 8;
+              if phase_accum < 0 then
+                phase_accum := phase_accum + 8;
+              end if;
+              pos_phase_reg <= phase_accum;
               busy <= '1';
               state <= S_INIT_COL;
             end if;
@@ -146,6 +154,11 @@ begin
               dist_class := step_count_reg;
             else
               dist_class := MAX_STEPS;
+            end if;
+
+            dist_class := dist_class + (pos_phase_reg / 2);
+            if (head_reg mod 2) = 1 then
+              dist_class := dist_class + 1;
             end if;
 
             if dist_class < 2 then

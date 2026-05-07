@@ -85,7 +85,7 @@ begin
     generic map (
       CLK_HZ => 25000000,
       TICK_HZ => 120,
-      MOVE_STEP_FP => 20,
+      MOVE_STEP_FP => 48,
       SHOOT_COOLDOWN_TICKS => 22
     )
     port map (

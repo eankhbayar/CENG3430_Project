@@ -21,9 +21,11 @@ end proj;
 architecture rtl of proj is
   constant SCREEN_W : integer := 640;
   constant SCREEN_H : integer := 480;
+  constant COLUMN_SCALE : integer := 8;
+  constant SAMPLE_W : integer := SCREEN_W / COLUMN_SCALE;
 
-  type int_array_t is array (0 to SCREEN_W - 1) of integer range 0 to SCREEN_H - 1;
-  type rgb_array_t is array (0 to SCREEN_W - 1) of std_logic_vector(11 downto 0);
+  type int_array_t is array (0 to SAMPLE_W - 1) of integer range 0 to SCREEN_H - 1;
+  type rgb_array_t is array (0 to SAMPLE_W - 1) of std_logic_vector(11 downto 0);
 
   signal clk_pix : std_logic;
   signal rst : std_logic := '0';
@@ -44,7 +46,7 @@ architecture rtl of proj is
   signal ray_busy : std_logic;
   signal ray_frame_done : std_logic;
   signal ray_write_en : std_logic;
-  signal ray_write_col : integer range 0 to SCREEN_W - 1;
+  signal ray_write_col : integer range 0 to SAMPLE_W - 1;
   signal wall_top : integer range 0 to SCREEN_H - 1;
   signal wall_bottom : integer range 0 to SCREEN_H - 1;
   signal wall_color : std_logic_vector(11 downto 0);
@@ -105,7 +107,8 @@ begin
   ray_i : entity work.raycaster_core
     generic map (
       SCREEN_W => SCREEN_W,
-      SCREEN_H => SCREEN_H
+      SCREEN_H => SCREEN_H,
+      COLUMN_SCALE => COLUMN_SCALE
     )
     port map (
       clk => clk_pix,
@@ -145,13 +148,16 @@ begin
 
   process(clk_pix)
     variable c : std_logic_vector(11 downto 0);
+    variable sample_col : integer range 0 to SAMPLE_W - 1;
   begin
     if rising_edge(clk_pix) then
       if vga_active = '1' then
-        if pix_y < wall_top_buf(pix_x) then
+        sample_col := pix_x / COLUMN_SCALE;
+
+        if pix_y < wall_top_buf(sample_col) then
           c := x"37A";
-        elsif pix_y <= wall_bottom_buf(pix_x) then
-          c := wall_color_buf(pix_x);
+        elsif pix_y <= wall_bottom_buf(sample_col) then
+          c := wall_color_buf(sample_col);
         else
           c := x"242";
         end if;

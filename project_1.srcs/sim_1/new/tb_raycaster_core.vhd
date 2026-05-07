@@ -7,15 +7,17 @@ entity tb_raycaster_core is
 end entity;
 
 architecture tb of tb_raycaster_core is
-  constant SCREEN_W_TB : integer := 32;
+  constant SCREEN_W_TB : integer := 64;
   constant SCREEN_H_TB : integer := 120;
+  constant SCALE_TB : integer := 4;
+  constant SAMPLE_W_TB : integer := SCREEN_W_TB / SCALE_TB;
 
   signal clk : std_logic := '0';
   signal rst : std_logic := '1';
   signal start : std_logic := '0';
 
   signal write_en : std_logic;
-  signal write_column : integer range 0 to SCREEN_W_TB - 1;
+  signal write_column : integer range 0 to SAMPLE_W_TB - 1;
   signal wall_top : integer range 0 to SCREEN_H_TB - 1;
   signal wall_bottom : integer range 0 to SCREEN_H_TB - 1;
   signal wall_color : std_logic_vector(11 downto 0);
@@ -29,7 +31,8 @@ begin
   dut : entity work.raycaster_core
     generic map (
       SCREEN_W => SCREEN_W_TB,
-      SCREEN_H => SCREEN_H_TB
+      SCREEN_H => SCREEN_H_TB,
+      COLUMN_SCALE => SCALE_TB
     )
     port map (
       clk => clk,
@@ -50,6 +53,8 @@ begin
   stim : process
     variable writes_seen : integer := 0;
     variable nonzero_color_seen : boolean := false;
+    variable min_top : integer := SCREEN_H_TB;
+    variable max_bottom : integer := 0;
   begin
     wait for 60 ns;
     rst <= '0';
@@ -64,14 +69,21 @@ begin
       if write_en = '1' then
         writes_seen := writes_seen + 1;
         assert wall_bottom > wall_top report "Invalid wall slice bounds" severity failure;
+        if wall_top < min_top then
+          min_top := wall_top;
+        end if;
+        if wall_bottom > max_bottom then
+          max_bottom := wall_bottom;
+        end if;
         if wall_color /= x"000" then
           nonzero_color_seen := true;
         end if;
       end if;
     end loop;
 
-    assert writes_seen = SCREEN_W_TB report "Did not produce one write per column" severity failure;
+    assert writes_seen = SAMPLE_W_TB report "Did not produce one write per sampled column" severity failure;
     assert nonzero_color_seen report "Wall color unexpectedly black" severity failure;
+    assert (max_bottom - min_top) > 20 report "Wall profile variation too small" severity failure;
     assert busy = '0' report "Raycaster remained busy after frame completion" severity failure;
 
     done <= true;

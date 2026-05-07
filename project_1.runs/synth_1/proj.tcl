@@ -89,8 +89,12 @@ set_property ip_cache_permissions {read write} [current_project]
 OPTRACE "Creating in-memory project" END { }
 OPTRACE "Adding files" START { }
 read_vhdl -library xil_defaultlib {
-  C:/Users/Student/Desktop/1155195234_lab05/1155195234_lab05/clock_divider.vhd
-  C:/Users/Student/Desktop/project_1/project_1.srcs/sources_1/new/proj.vhd
+  project_1.srcs/sources_1/new/raycast_pkg.vhd
+  project_1.srcs/sources_1/new/vga_timing.vhd
+  project_1.srcs/sources_1/new/game_state.vhd
+  project_1.srcs/sources_1/new/raycaster_core.vhd
+  project_1.srcs/sources_1/new/clock_divider.vhd
+  project_1.srcs/sources_1/new/proj.vhd
 }
 OPTRACE "Adding files" END { }
 # Mark all dcp files as not used in implementation to prevent them from being
@@ -101,12 +105,12 @@ OPTRACE "Adding files" END { }
 foreach dcp [get_files -quiet -all -filter file_type=="Design\ Checkpoint"] {
   set_property used_in_implementation false $dcp
 }
-read_xdc C:/Users/Student/Desktop/1155195234_lab05/1155195234_lab05/lab05.xdc
-set_property used_in_implementation false [get_files C:/Users/Student/Desktop/1155195234_lab05/1155195234_lab05/lab05.xdc]
+read_xdc project_1.srcs/constrs_1/new/lab05.xdc
+set_property used_in_implementation false [get_files project_1.srcs/constrs_1/new/lab05.xdc]
 
 set_param ips.enableIPCacheLiteLoad 1
 
-read_checkpoint -auto_incremental -incremental C:/Users/Student/Desktop/project_1/project_1.srcs/utils_1/imports/synth_1/lab05.dcp
+read_checkpoint -auto_incremental -incremental project_1.srcs/utils_1/imports/synth_1/lab05.dcp
 close [open __synthesis_is_running__ w]
 
 OPTRACE "synth_design" START { }

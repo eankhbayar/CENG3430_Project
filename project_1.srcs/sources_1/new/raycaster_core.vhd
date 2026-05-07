@@ -26,52 +26,24 @@ entity raycaster_core is
 end entity;
 
 architecture rtl of raycaster_core is
-  type state_t is (S_IDLE, S_INIT_COL, S_STEP_RAY, S_WRITE_COL);
-
+  type state_t is (S_IDLE, S_RENDER);
   signal state : state_t := S_IDLE;
-
-  signal p_x_reg : integer := 0;
-  signal p_y_reg : integer := 0;
-  signal head_reg : heading_t := 0;
-
   signal col_reg : integer range 0 to SCREEN_W - 1 := 0;
-  signal ray_heading_reg : heading_t := 0;
-  signal step_x_fp_reg : integer := 0;
-  signal step_y_fp_reg : integer := 0;
-  signal sample_x_fp_reg : integer := 0;
-  signal sample_y_fp_reg : integer := 0;
-  signal dist_fp_reg : integer := 48;
-  signal step_count_reg : integer range 0 to 47 := 0;
-
-  signal hit_reg : std_logic := '0';
+  signal heading_reg : heading_t := 0;
 begin
   process(clk)
-    variable heading_ofs : integer;
-    variable next_x : integer;
-    variable next_y : integer;
-    variable next_dist : integer;
-    variable tile_x : integer;
-    variable tile_y : integer;
+    variable dist_class : integer;
     variable slice_h : integer;
     variable top_v : integer;
     variable bot_v : integer;
     variable color_v : std_logic_vector(11 downto 0);
+    variable heading_band : integer;
   begin
     if rising_edge(clk) then
       if rst = '1' then
         state <= S_IDLE;
-        p_x_reg <= 0;
-        p_y_reg <= 0;
-        head_reg <= 0;
         col_reg <= 0;
-        ray_heading_reg <= 0;
-        step_x_fp_reg <= 0;
-        step_y_fp_reg <= 0;
-        sample_x_fp_reg <= 0;
-        sample_y_fp_reg <= 0;
-        dist_fp_reg <= 48;
-        step_count_reg <= 0;
-        hit_reg <= '0';
+        heading_reg <= 0;
         write_en <= '0';
         write_column <= 0;
         wall_top <= 0;
@@ -87,79 +59,56 @@ begin
           when S_IDLE =>
             busy <= '0';
             if start = '1' then
-              p_x_reg <= player_x_fp;
-              p_y_reg <= player_y_fp;
-              head_reg <= wrap_heading(heading_idx);
               col_reg <= 0;
+              heading_reg <= wrap_heading(heading_idx);
               busy <= '1';
-              state <= S_INIT_COL;
+              state <= S_RENDER;
             end if;
 
-          when S_INIT_COL =>
-            if (col_reg * 8) < (SCREEN_W * 1) then
-              heading_ofs := -3;
-            elsif (col_reg * 8) < (SCREEN_W * 2) then
-              heading_ofs := -2;
-            elsif (col_reg * 8) < (SCREEN_W * 3) then
-              heading_ofs := -1;
-            elsif (col_reg * 8) < (SCREEN_W * 5) then
-              heading_ofs := 0;
-            elsif (col_reg * 8) < (SCREEN_W * 6) then
-              heading_ofs := 1;
-            elsif (col_reg * 8) < (SCREEN_W * 7) then
-              heading_ofs := 2;
+          when S_RENDER =>
+            if heading_reg < 4 then
+              heading_band := 0;
+            elsif heading_reg < 8 then
+              heading_band := 1;
+            elsif heading_reg < 12 then
+              heading_band := 2;
             else
-              heading_ofs := 3;
+              heading_band := 3;
             end if;
 
-            ray_heading_reg <= wrap_heading(head_reg + heading_ofs);
-            step_x_fp_reg <= (dir_x(wrap_heading(head_reg + heading_ofs)) * 48) / 256;
-            step_y_fp_reg <= (dir_y(wrap_heading(head_reg + heading_ofs)) * 48) / 256;
-
-            if ((dir_x(wrap_heading(head_reg + heading_ofs)) * 48) / 256 = 0) and
-               ((dir_y(wrap_heading(head_reg + heading_ofs)) * 48) / 256 = 0) then
-              step_x_fp_reg <= 1;
-            end if;
-
-            sample_x_fp_reg <= p_x_reg;
-            sample_y_fp_reg <= p_y_reg;
-            dist_fp_reg <= 48;
-            step_count_reg <= 0;
-            hit_reg <= '0';
-            state <= S_STEP_RAY;
-
-          when S_STEP_RAY =>
-            next_x := sample_x_fp_reg + step_x_fp_reg;
-            next_y := sample_y_fp_reg + step_y_fp_reg;
-            next_dist := dist_fp_reg + 48;
-
-            sample_x_fp_reg <= next_x;
-            sample_y_fp_reg <= next_y;
-            dist_fp_reg <= next_dist;
-
-            tile_x := next_x / TILE_SIZE_FP;
-            tile_y := next_y / TILE_SIZE_FP;
-
-            if map_is_wall(tile_x, tile_y) then
-              hit_reg <= '1';
-              state <= S_WRITE_COL;
-            elsif step_count_reg = 47 then
-              hit_reg <= '0';
-              state <= S_WRITE_COL;
+            if col_reg < (SCREEN_W / 8) then
+              dist_class := 4 + heading_band;
+            elsif col_reg < (SCREEN_W / 4) then
+              dist_class := 3 + heading_band;
+            elsif col_reg < ((3 * SCREEN_W) / 8) then
+              dist_class := 2 + heading_band;
+            elsif col_reg < ((5 * SCREEN_W) / 8) then
+              dist_class := 1 + heading_band;
+            elsif col_reg < ((3 * SCREEN_W) / 4) then
+              dist_class := 2 + heading_band;
+            elsif col_reg < ((7 * SCREEN_W) / 8) then
+              dist_class := 3 + heading_band;
             else
-              step_count_reg <= step_count_reg + 1;
+              dist_class := 4 + heading_band;
             end if;
 
-          when S_WRITE_COL =>
-            if dist_fp_reg < 96 then
-              slice_h := SCREEN_H;
+            if dist_class <= 1 then
+              slice_h := SCREEN_H - 20;
+              color_v := x"FD4";
+            elsif dist_class = 2 then
+              slice_h := (SCREEN_H * 3) / 4;
+              color_v := x"DA3";
+            elsif dist_class = 3 then
+              slice_h := SCREEN_H / 2;
+              color_v := x"B82";
+            elsif dist_class = 4 then
+              slice_h := SCREEN_H / 3;
+              color_v := x"975";
             else
-              slice_h := (SCREEN_H * 140) / dist_fp_reg;
+              slice_h := SCREEN_H / 4;
+              color_v := x"753";
             end if;
 
-            if slice_h > SCREEN_H then
-              slice_h := SCREEN_H;
-            end if;
             if slice_h < 6 then
               slice_h := 6;
             end if;
@@ -174,18 +123,6 @@ begin
               bot_v := SCREEN_H - 1;
             end if;
 
-            if hit_reg = '0' then
-              color_v := x"444";
-            elsif dist_fp_reg < 220 then
-              color_v := x"FD4";
-            elsif dist_fp_reg < 380 then
-              color_v := x"DA3";
-            elsif dist_fp_reg < 620 then
-              color_v := x"A72";
-            else
-              color_v := x"753";
-            end if;
-
             write_en <= '1';
             write_column <= col_reg;
             wall_top <= top_v;
@@ -198,7 +135,6 @@ begin
               state <= S_IDLE;
             else
               col_reg <= col_reg + 1;
-              state <= S_INIT_COL;
             end if;
         end case;
       end if;

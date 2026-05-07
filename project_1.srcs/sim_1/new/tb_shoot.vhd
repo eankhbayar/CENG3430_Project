@@ -13,6 +13,7 @@ architecture tb of tb_shoot is
   signal px, py : integer;
   signal heading : integer range 0 to 15;
   signal shoot_pulse, shoot_hit, muzzle_flash : std_logic;
+  signal enemy_alive, bullet_active : std_logic;
   signal done : boolean := false;
 begin
   clk <= not clk after 5 ns when not done else '0';
@@ -37,7 +38,9 @@ begin
       heading_idx => heading,
       shoot_pulse => shoot_pulse,
       shoot_hit => shoot_hit,
-      muzzle_flash => muzzle_flash
+      muzzle_flash => muzzle_flash,
+      enemy_alive => enemy_alive,
+      bullet_active => bullet_active
     );
 
   stim : process
@@ -71,6 +74,7 @@ begin
 
     assert pulse_count <= 2 report "Cooldown failed: too many shoot pulses" severity failure;
     assert muzzle_flash = '1' or muzzle_flash = '0' report "muzzle_flash unknown" severity failure;
+    assert bullet_active = '1' or bullet_active = '0' report "bullet_active unknown" severity failure;
 
     done <= true;
     report "tb_shoot passed" severity note;

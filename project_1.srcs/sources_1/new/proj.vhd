@@ -27,6 +27,8 @@ architecture rtl of proj is
   constant MINIMAP_SCALE : integer := 4;
   constant MINIMAP_W_PX : integer := MAP_W * MINIMAP_SCALE;
   constant MINIMAP_H_PX : integer := MAP_H * MINIMAP_SCALE;
+  constant ENEMY_TILE_X : integer := 20;
+  constant ENEMY_TILE_Y : integer := 6;
 
   type int_array_t is array (0 to SAMPLE_W - 1) of integer range 0 to SCREEN_H - 1;
   type rgb_array_t is array (0 to SAMPLE_W - 1) of std_logic_vector(11 downto 0);
@@ -45,6 +47,8 @@ architecture rtl of proj is
   signal shoot_pulse : std_logic;
   signal shoot_hit : std_logic;
   signal muzzle_flash : std_logic;
+  signal enemy_alive : std_logic;
+  signal bullet_active : std_logic;
 
   signal ray_start : std_logic := '0';
   signal ray_busy : std_logic;
@@ -62,6 +66,9 @@ architecture rtl of proj is
   signal player_x_frame : integer := 0;
   signal player_y_frame : integer := 0;
   signal heading_frame  : integer range 0 to 15 := 0;
+  signal enemy_visible_frame : std_logic := '0';
+  signal enemy_screen_x_frame : integer range 0 to SCREEN_W - 1 := SCREEN_W / 2;
+  signal enemy_size_frame : integer range 12 to 120 := 48;
 
   signal rgb : std_logic_vector(11 downto 0) := (others => '0');
 begin
@@ -105,7 +112,9 @@ begin
       heading_idx => heading_idx,
       shoot_pulse => shoot_pulse,
       shoot_hit => shoot_hit,
-      muzzle_flash => muzzle_flash
+      muzzle_flash => muzzle_flash,
+      enemy_alive => enemy_alive,
+      bullet_active => bullet_active
     );
 
   ray_i : entity work.raycaster_core
@@ -131,6 +140,17 @@ begin
     );
 
   process(clk_pix)
+    variable player_tile_x : integer;
+    variable player_tile_y : integer;
+    variable enemy_vec_x : integer;
+    variable enemy_vec_y : integer;
+    variable dir_code : integer;
+    variable look_dx : integer;
+    variable look_dy : integer;
+    variable dot_v : integer;
+    variable cross_v : integer;
+    variable sx : integer;
+    variable sz : integer;
   begin
     if rising_edge(clk_pix) then
       ray_start <= '0';
@@ -140,6 +160,53 @@ begin
         player_y_frame <= player_y_fp;
         heading_frame <= heading_idx;
         ray_start <= '1';
+
+        player_tile_x := player_x_fp / TILE_SIZE_FP;
+        player_tile_y := player_y_fp / TILE_SIZE_FP;
+        enemy_vec_x := ENEMY_TILE_X - player_tile_x;
+        enemy_vec_y := ENEMY_TILE_Y - player_tile_y;
+
+        dir_code := heading_idx / 2;
+        case dir_code is
+          when 0 => look_dx := 1;  look_dy := 0;
+          when 1 => look_dx := 1;  look_dy := 1;
+          when 2 => look_dx := 0;  look_dy := 1;
+          when 3 => look_dx := -1; look_dy := 1;
+          when 4 => look_dx := -1; look_dy := 0;
+          when 5 => look_dx := -1; look_dy := -1;
+          when 6 => look_dx := 0;  look_dy := -1;
+          when others => look_dx := 1; look_dy := -1;
+        end case;
+
+        dot_v := enemy_vec_x * look_dx + enemy_vec_y * look_dy;
+        cross_v := enemy_vec_x * look_dy - enemy_vec_y * look_dx;
+
+        if (enemy_alive = '1') and (dot_v > 0) and (dot_v <= 14) and (abs(cross_v) <= dot_v + 1) then
+          enemy_visible_frame <= '1';
+          sx := (SCREEN_W / 2) + (cross_v * 22);
+          if sx < 40 then
+            enemy_screen_x_frame <= 40;
+          elsif sx > SCREEN_W - 40 then
+            enemy_screen_x_frame <= SCREEN_W - 40;
+          else
+            enemy_screen_x_frame <= sx;
+          end if;
+
+          if dot_v < 3 then
+            sz := 104;
+          elsif dot_v < 6 then
+            sz := 80;
+          elsif dot_v < 9 then
+            sz := 60;
+          else
+            sz := 44;
+          end if;
+          enemy_size_frame <= sz;
+        else
+          enemy_visible_frame <= '0';
+          enemy_screen_x_frame <= SCREEN_W / 2;
+          enemy_size_frame <= 44;
+        end if;
       end if;
 
       if ray_write_en = '1' then
@@ -160,6 +227,8 @@ begin
     variable heading_code : integer;
     variable pov_dx : integer;
     variable pov_dy : integer;
+    variable body_top : integer;
+    variable body_bot : integer;
   begin
     if rising_edge(clk_pix) then
       if vga_active = '1' then
@@ -172,6 +241,39 @@ begin
         else
           c := x"242";
         end if;
+
+        if enemy_visible_frame = '1' then
+          body_top := 240 - enemy_size_frame;
+          body_bot := 240 + enemy_size_frame;
+
+          if (pix_x >= enemy_screen_x_frame - (enemy_size_frame / 4)) and
+             (pix_x <= enemy_screen_x_frame + (enemy_size_frame / 4)) and
+             (pix_y >= body_top + (enemy_size_frame / 2)) and
+             (pix_y <= body_bot) then
+            c := x"0F0";
+          elsif (pix_x >= enemy_screen_x_frame - (enemy_size_frame / 3)) and
+                (pix_x <= enemy_screen_x_frame + (enemy_size_frame / 3)) and
+                (pix_y >= body_top) and
+                (pix_y <= body_top + (enemy_size_frame / 3)) then
+            c := x"0F0";
+          elsif (pix_y = body_top + (enemy_size_frame / 2)) and
+                (pix_x >= enemy_screen_x_frame - (enemy_size_frame / 2)) and
+                (pix_x <= enemy_screen_x_frame + (enemy_size_frame / 2)) then
+            c := x"0F0";
+          end if;
+        end if;
+
+        if bullet_active = '1' and (pix_x >= 318 and pix_x <= 322) and (pix_y >= 170 and pix_y <= 320) then
+          c := x"FF0";
+        end if;
+
+        if (pix_x >= 285 and pix_x <= 355) and (pix_y >= 410 and pix_y <= 479) then
+          c := x"44A";
+          if (pix_x >= 300 and pix_x <= 340) and (pix_y >= 430 and pix_y <= 479) then
+            c := x"66C";
+          end if;
+        end if;
+
         if (pix_x < MINIMAP_W_PX) and (pix_y < MINIMAP_H_PX) then
           map_tile_x := pix_x / MINIMAP_SCALE;
           map_tile_y := pix_y / MINIMAP_SCALE;
@@ -194,6 +296,10 @@ begin
             c := x"333";
           else
             c := x"062";
+          end if;
+
+          if (enemy_alive = '1') and (map_tile_x = ENEMY_TILE_X) and (map_tile_y = ENEMY_TILE_Y) then
+            c := x"0FF";
           end if;
 
           if (map_tile_x = player_tile_x) and (map_tile_y = player_tile_y) then

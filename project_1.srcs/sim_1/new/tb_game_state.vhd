@@ -14,6 +14,7 @@ architecture tb of tb_game_state is
   signal px, py : integer;
   signal heading : integer range 0 to 15;
   signal shoot_pulse, shoot_hit, muzzle_flash : std_logic;
+  signal enemy_alive, bullet_active : std_logic;
   signal done : boolean := false;
 begin
   clk <= not clk after 5 ns when not done else '0';
@@ -38,12 +39,13 @@ begin
       heading_idx => heading,
       shoot_pulse => shoot_pulse,
       shoot_hit => shoot_hit,
-      muzzle_flash => muzzle_flash
+      muzzle_flash => muzzle_flash,
+      enemy_alive => enemy_alive,
+      bullet_active => bullet_active
     );
 
   stim : process
     variable start_x, start_y : integer;
-    variable pulses : integer := 0;
     variable tx, ty : integer;
   begin
     wait for 50 ns;
@@ -54,7 +56,7 @@ begin
     start_y := py;
 
     btnr <= '1';
-    wait for 220 ns;
+    wait for 280 ns;
     btnr <= '0';
     wait for 120 ns;
     assert heading /= 0 report "Turn-right did not change heading" severity failure;
@@ -73,22 +75,11 @@ begin
     btnc <= '1';
     wait for 110 ns;
     btnc <= '0';
-
-    wait for 500 ns;
-    if shoot_pulse = '1' then
-      pulses := pulses + 1;
-    end if;
-
-    btnc <= '1';
-    wait for 110 ns;
-    btnc <= '0';
-
-    wait for 300 ns;
-    if shoot_pulse = '1' then
-      pulses := pulses + 1;
-    end if;
+    wait for 250 ns;
 
     assert muzzle_flash = '1' or muzzle_flash = '0' report "Muzzle flash unknown" severity failure;
+    assert bullet_active = '1' or bullet_active = '0' report "Bullet activity unknown" severity failure;
+    assert enemy_alive = '1' or enemy_alive = '0' report "Enemy state unknown" severity failure;
 
     done <= true;
     report "tb_game_state passed" severity note;

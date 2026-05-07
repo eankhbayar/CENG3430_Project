@@ -23,12 +23,16 @@ entity game_state is
     heading_idx : out integer range 0 to 15;
     shoot_pulse : out std_logic;
     shoot_hit : out std_logic;
-    muzzle_flash : out std_logic
+    muzzle_flash : out std_logic;
+    enemy_alive : out std_logic;
+    bullet_active : out std_logic
   );
 end entity;
 
 architecture rtl of game_state is
   constant TICK_DIV : integer := CLK_HZ / TICK_HZ;
+  constant ENEMY_TILE_X : integer := 20;
+  constant ENEMY_TILE_Y : integer := 6;
 
   signal tick_counter : integer range 0 to TICK_DIV - 1 := 0;
   signal tick_en : std_logic := '0';
@@ -39,12 +43,14 @@ architecture rtl of game_state is
 
   signal cooldown : integer range 0 to SHOOT_COOLDOWN_TICKS := 0;
   signal flash_cnt : integer range 0 to 10 := 0;
+  signal bullet_cnt : integer range 0 to 6 := 0;
   signal turn_delay : integer range 0 to 2 := 0;
 
   signal btnc_d : std_logic := '0';
 
   signal shoot_evt : std_logic := '0';
   signal shoot_hit_i : std_logic := '0';
+  signal enemy_alive_i : std_logic := '1';
 begin
   process(clk)
   begin
@@ -68,6 +74,12 @@ begin
     variable dirx, diry : integer;
     variable n_x, n_y : integer;
     variable tx, ty : integer;
+    variable dir_code : integer;
+    variable look_dx, look_dy : integer;
+    variable enemy_vec_x : integer;
+    variable enemy_vec_y : integer;
+    variable dot_v : integer;
+    variable cross_v : integer;
   begin
     if rising_edge(clk) then
       if rst = '1' then
@@ -76,10 +88,12 @@ begin
         head_i <= 0;
         cooldown <= 0;
         flash_cnt <= 0;
+        bullet_cnt <= 0;
         turn_delay <= 0;
         btnc_d <= '0';
         shoot_evt <= '0';
         shoot_hit_i <= '0';
+        enemy_alive_i <= '1';
       elsif tick_en = '1' then
         shoot_evt <= '0';
         shoot_hit_i <= '0';
@@ -135,11 +149,43 @@ begin
           flash_cnt <= flash_cnt - 1;
         end if;
 
+        if bullet_cnt > 0 then
+          bullet_cnt <= bullet_cnt - 1;
+        end if;
+
         if (btnc = '1') and (btnc_d = '0') and (cooldown = 0) then
           shoot_evt <= '1';
           cooldown <= SHOOT_COOLDOWN_TICKS;
           flash_cnt <= 8;
-          shoot_hit_i <= '0';
+          bullet_cnt <= 3;
+
+          if enemy_alive_i = '1' then
+            tx := p_x_fp / TILE_SIZE_FP;
+            ty := p_y_fp / TILE_SIZE_FP;
+
+            enemy_vec_x := ENEMY_TILE_X - tx;
+            enemy_vec_y := ENEMY_TILE_Y - ty;
+
+            dir_code := head_i / 2;
+            case dir_code is
+              when 0 => look_dx := 1;  look_dy := 0;
+              when 1 => look_dx := 1;  look_dy := 1;
+              when 2 => look_dx := 0;  look_dy := 1;
+              when 3 => look_dx := -1; look_dy := 1;
+              when 4 => look_dx := -1; look_dy := 0;
+              when 5 => look_dx := -1; look_dy := -1;
+              when 6 => look_dx := 0;  look_dy := -1;
+              when others => look_dx := 1; look_dy := -1;
+            end case;
+
+            dot_v := enemy_vec_x * look_dx + enemy_vec_y * look_dy;
+            cross_v := enemy_vec_x * look_dy - enemy_vec_y * look_dx;
+
+            if (dot_v > 0) and (dot_v <= 12) and (abs(cross_v) <= 1) then
+              shoot_hit_i <= '1';
+              enemy_alive_i <= '0';
+            end if;
+          end if;
         end if;
 
         btnc_d <= btnc;
@@ -153,4 +199,6 @@ begin
   shoot_pulse <= shoot_evt;
   shoot_hit <= shoot_hit_i;
   muzzle_flash <= '1' when flash_cnt > 0 else '0';
+  enemy_alive <= enemy_alive_i;
+  bullet_active <= '1' when bullet_cnt > 0 else '0';
 end architecture;

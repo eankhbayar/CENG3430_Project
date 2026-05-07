@@ -28,48 +28,66 @@ end entity;
 
 architecture rtl of raycaster_core is
   constant SAMPLE_W : integer := SCREEN_W / COLUMN_SCALE;
-  constant MAX_STEPS : integer := 24;
+  constant MAX_STEPS : integer := 28;
+  constant DIST_SCALE : integer := 1024;
 
   type state_t is (S_IDLE, S_INIT_COL, S_STEP, S_WRITE);
   signal state : state_t := S_IDLE;
 
   signal head_reg : heading_t := 0;
   signal col_reg : integer range 0 to SAMPLE_W - 1 := 0;
-  signal pos_phase_reg : integer range 0 to 7 := 0;
 
-  signal tile_x_reg : integer := 0;
-  signal tile_y_reg : integer := 0;
-  signal step_dx_reg : integer range -1 to 1 := 0;
-  signal step_dy_reg : integer range -1 to 1 := 0;
+  signal map_x_reg : integer := 0;
+  signal map_y_reg : integer := 0;
+  signal step_x_reg : integer range -1 to 1 := 0;
+  signal step_y_reg : integer range -1 to 1 := 0;
+  signal delta_x_reg : integer := DIST_SCALE;
+  signal delta_y_reg : integer := DIST_SCALE;
+  signal side_x_reg : integer := 0;
+  signal side_y_reg : integer := 0;
+  signal ray_dx_reg : integer := 0;
+  signal ray_dy_reg : integer := 0;
   signal step_count_reg : integer range 0 to MAX_STEPS := 0;
+  signal hit_side_reg : integer range 0 to 1 := 0;
   signal hit_reg : std_logic := '0';
+  signal perp_dist_reg : integer := DIST_SCALE;
 begin
   process(clk)
     variable heading_ofs : integer;
     variable ray_heading : heading_t;
-    variable dir_code : integer;
+    variable player_tile_x : integer;
+    variable player_tile_y : integer;
+    variable frac_x : integer;
+    variable frac_y : integer;
+    variable inv_dx : integer;
+    variable inv_dy : integer;
     variable nx : integer;
     variable ny : integer;
-    variable dist_class : integer;
+    variable dist_v : integer;
     variable slice_h : integer;
     variable top_v : integer;
     variable bot_v : integer;
     variable color_v : std_logic_vector(11 downto 0);
-    variable map_px : integer;
-    variable map_py : integer;
-    variable phase_accum : integer;
   begin
     if rising_edge(clk) then
       if rst = '1' then
         state <= S_IDLE;
         head_reg <= 0;
         col_reg <= 0;
-        tile_x_reg <= 0;
-        tile_y_reg <= 0;
-        step_dx_reg <= 0;
-        step_dy_reg <= 0;
+        map_x_reg <= 0;
+        map_y_reg <= 0;
+        step_x_reg <= 0;
+        step_y_reg <= 0;
+        delta_x_reg <= DIST_SCALE;
+        delta_y_reg <= DIST_SCALE;
+        side_x_reg <= 0;
+        side_y_reg <= 0;
+        ray_dx_reg <= 0;
+        ray_dy_reg <= 0;
         step_count_reg <= 0;
+        hit_side_reg <= 0;
         hit_reg <= '0';
+        perp_dist_reg <= DIST_SCALE;
         write_en <= '0';
         write_column <= 0;
         wall_top <= 0;
@@ -77,7 +95,6 @@ begin
         wall_color <= x"444";
         busy <= '0';
         frame_done <= '0';
-        pos_phase_reg <= 0;
       else
         write_en <= '0';
         frame_done <= '0';
@@ -88,11 +105,6 @@ begin
             if start = '1' then
               head_reg <= wrap_heading(heading_idx);
               col_reg <= 0;
-              phase_accum := ((player_x_fp / 32) + (player_y_fp / 32)) mod 8;
-              if phase_accum < 0 then
-                phase_accum := phase_accum + 8;
-              end if;
-              pos_phase_reg <= phase_accum;
               busy <= '1';
               state <= S_INIT_COL;
             end if;
@@ -119,33 +131,79 @@ begin
             end if;
 
             ray_heading := wrap_heading(head_reg + heading_ofs);
-            dir_code := ray_heading / 2;
+            ray_dx_reg <= dir_x(ray_heading);
+            ray_dy_reg <= dir_y(ray_heading);
 
-            case dir_code is
-              when 0 => step_dx_reg <= 1;  step_dy_reg <= 0;
-              when 1 => step_dx_reg <= 1;  step_dy_reg <= 1;
-              when 2 => step_dx_reg <= 0;  step_dy_reg <= 1;
-              when 3 => step_dx_reg <= -1; step_dy_reg <= 1;
-              when 4 => step_dx_reg <= -1; step_dy_reg <= 0;
-              when 5 => step_dx_reg <= -1; step_dy_reg <= -1;
-              when 6 => step_dx_reg <= 0;  step_dy_reg <= -1;
-              when others => step_dx_reg <= 1; step_dy_reg <= -1;
-            end case;
+            player_tile_x := player_x_fp / TILE_SIZE_FP;
+            player_tile_y := player_y_fp / TILE_SIZE_FP;
+            frac_x := player_x_fp mod TILE_SIZE_FP;
+            frac_y := player_y_fp mod TILE_SIZE_FP;
 
-            map_px := player_x_fp / TILE_SIZE_FP;
-            map_py := player_y_fp / TILE_SIZE_FP;
-            tile_x_reg <= map_px;
-            tile_y_reg <= map_py;
+            map_x_reg <= player_tile_x;
+            map_y_reg <= player_tile_y;
+
+            if dir_x(ray_heading) >= 0 then
+              step_x_reg <= 1;
+            else
+              step_x_reg <= -1;
+            end if;
+
+            if dir_y(ray_heading) >= 0 then
+              step_y_reg <= 1;
+            else
+              step_y_reg <= -1;
+            end if;
+
+            if abs(dir_x(ray_heading)) < 8 then
+              inv_dx := DIST_SCALE;
+            else
+              inv_dx := DIST_SCALE / abs(dir_x(ray_heading));
+            end if;
+
+            if abs(dir_y(ray_heading)) < 8 then
+              inv_dy := DIST_SCALE;
+            else
+              inv_dy := DIST_SCALE / abs(dir_y(ray_heading));
+            end if;
+
+            delta_x_reg <= inv_dx;
+            delta_y_reg <= inv_dy;
+
+            if dir_x(ray_heading) >= 0 then
+              side_x_reg <= (TILE_SIZE_FP - frac_x) * inv_dx;
+            else
+              side_x_reg <= frac_x * inv_dx;
+            end if;
+
+            if dir_y(ray_heading) >= 0 then
+              side_y_reg <= (TILE_SIZE_FP - frac_y) * inv_dy;
+            else
+              side_y_reg <= frac_y * inv_dy;
+            end if;
+
             step_count_reg <= 0;
+            hit_side_reg <= 0;
             hit_reg <= '0';
+            perp_dist_reg <= DIST_SCALE;
             state <= S_STEP;
 
           when S_STEP =>
-            nx := tile_x_reg + step_dx_reg;
-            ny := tile_y_reg + step_dy_reg;
+            nx := map_x_reg;
+            ny := map_y_reg;
 
-            tile_x_reg <= nx;
-            tile_y_reg <= ny;
+            if side_x_reg < side_y_reg then
+              nx := map_x_reg + step_x_reg;
+              map_x_reg <= nx;
+              side_x_reg <= side_x_reg + (TILE_SIZE_FP * delta_x_reg);
+              hit_side_reg <= 0;
+              perp_dist_reg <= side_x_reg;
+            else
+              ny := map_y_reg + step_y_reg;
+              map_y_reg <= ny;
+              side_y_reg <= side_y_reg + (TILE_SIZE_FP * delta_y_reg);
+              hit_side_reg <= 1;
+              perp_dist_reg <= side_y_reg;
+            end if;
 
             if map_is_wall(nx, ny) then
               hit_reg <= '1';
@@ -159,34 +217,33 @@ begin
 
           when S_WRITE =>
             if hit_reg = '1' then
-              dist_class := step_count_reg;
+              dist_v := perp_dist_reg / TILE_SIZE_FP;
             else
-              dist_class := MAX_STEPS;
+              dist_v := MAX_STEPS * 2;
             end if;
 
-            dist_class := dist_class + (pos_phase_reg / 2);
-            if (head_reg mod 2) = 1 then
-              dist_class := dist_class + 1;
-            end if;
-
-            if dist_class < 2 then
-              slice_h := SCREEN_H - 16;
+            if dist_v < 2 then
+              slice_h := SCREEN_H - 18;
               color_v := x"FD4";
-            elsif dist_class < 4 then
+            elsif dist_v < 4 then
               slice_h := (SCREEN_H * 3) / 4;
               color_v := x"DA3";
-            elsif dist_class < 7 then
+            elsif dist_v < 7 then
               slice_h := SCREEN_H / 2;
               color_v := x"B82";
-            elsif dist_class < 12 then
+            elsif dist_v < 12 then
               slice_h := SCREEN_H / 3;
               color_v := x"975";
-            elsif dist_class < 18 then
+            elsif dist_v < 18 then
               slice_h := SCREEN_H / 4;
               color_v := x"753";
             else
               slice_h := SCREEN_H / 5;
               color_v := x"532";
+            end if;
+
+            if hit_side_reg = 1 then
+              color_v(11 downto 8) := std_logic_vector(unsigned(color_v(11 downto 8)) - 1);
             end if;
 
             if slice_h < 6 then

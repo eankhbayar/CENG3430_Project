@@ -56,8 +56,6 @@ package body raycast_pkg is
   end function;
 
   function map_is_wall(tile_x : integer; tile_y : integer) return boolean is
-    variable internal_a : integer;
-    variable internal_b : integer;
   begin
     if (tile_x < 0) or (tile_y < 0) or (tile_x >= MAP_W) or (tile_y >= MAP_H) then
       return true;
@@ -67,16 +65,13 @@ package body raycast_pkg is
       return true;
     end if;
 
-    internal_a := (tile_x * 7 + tile_y * 3 + 5) mod 11;
-    internal_b := (tile_x * 5 - tile_y * 2 + 31) mod 13;
-
     if (tile_x = 8) and (tile_y > 2) and (tile_y < 13) then
       return true;
-    elsif (tile_y = 5) and (tile_x > 3) and (tile_x < 12) then
+    elsif (tile_y = 8) and (tile_x > 2) and (tile_x < 13) then
       return true;
-    elsif (internal_a = 0) and ((tile_y mod 2) = 0) then
+    elsif (tile_x = 4) and (tile_y >= 4) and (tile_y <= 11) then
       return true;
-    elsif (internal_b = 0) and ((tile_x mod 3) = 1) then
+    elsif (tile_y = 11) and (tile_x >= 4) and (tile_x <= 11) then
       return true;
     else
       return false;
@@ -89,33 +84,49 @@ package body raycast_pkg is
     heading_idx : heading_t;
     column_idx  : integer;
     screen_w    : integer) return integer is
-    variable base_dx : integer;
-    variable base_dy : integer;
-    variable ray_dx  : integer;
-    variable ray_dy  : integer;
-    variable cam_x   : integer;
+    variable ray_heading : heading_t;
+    variable heading_ofs : integer;
+    variable step_x_fp : integer;
+    variable step_y_fp : integer;
     variable dist_fp : integer;
     variable sample_x_fp : integer;
     variable sample_y_fp : integer;
     variable tile_x : integer;
     variable tile_y : integer;
   begin
-    base_dx := dir_x(heading_idx);
-    base_dy := dir_y(heading_idx);
-
-    cam_x := ((column_idx * 2 - (screen_w - 1)) * 96) / screen_w;
-
-    ray_dx := base_dx + ((-base_dy * cam_x) / 128);
-    ray_dy := base_dy + (( base_dx * cam_x) / 128);
-
-    if (ray_dx = 0) and (ray_dy = 0) then
-      ray_dx := 1;
+    if (column_idx * 8) < (screen_w * 1) then
+      heading_ofs := -3;
+    elsif (column_idx * 8) < (screen_w * 2) then
+      heading_ofs := -2;
+    elsif (column_idx * 8) < (screen_w * 3) then
+      heading_ofs := -1;
+    elsif (column_idx * 8) < (screen_w * 5) then
+      heading_ofs := 0;
+    elsif (column_idx * 8) < (screen_w * 6) then
+      heading_ofs := 1;
+    elsif (column_idx * 8) < (screen_w * 7) then
+      heading_ofs := 2;
+    else
+      heading_ofs := 3;
     end if;
 
-    for step in 1 to 128 loop
-      dist_fp := step * 24;
-      sample_x_fp := player_x_fp + ((ray_dx * dist_fp) / 256);
-      sample_y_fp := player_y_fp + ((ray_dy * dist_fp) / 256);
+    ray_heading := wrap_heading(heading_idx + heading_ofs);
+
+    step_x_fp := (dir_x(ray_heading) * 48) / 256;
+    step_y_fp := (dir_y(ray_heading) * 48) / 256;
+
+    if (step_x_fp = 0) and (step_y_fp = 0) then
+      step_x_fp := 1;
+    end if;
+
+    sample_x_fp := player_x_fp;
+    sample_y_fp := player_y_fp;
+    dist_fp := 0;
+
+    for step in 1 to 48 loop
+      sample_x_fp := sample_x_fp + step_x_fp;
+      sample_y_fp := sample_y_fp + step_y_fp;
+      dist_fp := dist_fp + 48;
 
       tile_x := sample_x_fp / TILE_SIZE_FP;
       tile_y := sample_y_fp / TILE_SIZE_FP;
@@ -125,6 +136,6 @@ package body raycast_pkg is
       end if;
     end loop;
 
-    return 128 * 24;
+    return 48 * 48;
   end function;
 end package body;

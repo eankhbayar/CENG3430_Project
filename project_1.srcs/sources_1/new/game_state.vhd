@@ -27,13 +27,18 @@ entity game_state is
     enemy_alive : out std_logic;
     bullet_active : out std_logic;
     enemy_x_tile : out integer range 0 to MAP_W - 1;
-    enemy_y_tile : out integer range 0 to MAP_H - 1
+    enemy_y_tile : out integer range 0 to MAP_H - 1;
+    kill_count : out integer range 0 to 99;
+    score : out integer range 0 to 9999;
+    level : out integer range 0 to 9
   );
 end entity;
 
 architecture rtl of game_state is
   constant TICK_DIV : integer := CLK_HZ / TICK_HZ;
   constant ENEMY_RESPAWN_TICKS : integer := 360;
+  constant ENEMY_RESPAWN_MIN_TICKS : integer := 120;
+  constant ENEMY_RESPAWN_STEP : integer := 8;
 
   signal tick_counter : integer range 0 to TICK_DIV - 1 := 0;
   signal tick_en : std_logic := '0';
@@ -55,6 +60,8 @@ architecture rtl of game_state is
   signal enemy_respawn_cnt : integer range 0 to ENEMY_RESPAWN_TICKS := 0;
   signal enemy_x_i : integer range 0 to MAP_W - 1 := 20;
   signal enemy_y_i : integer range 0 to MAP_H - 1 := 6;
+  signal kill_count_i : integer range 0 to 99 := 0;
+  signal score_i : integer range 0 to 9999 := 0;
   signal lfsr : std_logic_vector(15 downto 0) := x"ACE1";
 begin
   process(clk)
@@ -89,6 +96,7 @@ begin
     variable spawn_x : integer;
     variable spawn_y : integer;
     variable lfsr_n : std_logic_vector(15 downto 0);
+    variable next_respawn : integer;
   begin
     if rising_edge(clk) then
       if rst = '1' then
@@ -106,6 +114,8 @@ begin
         enemy_respawn_cnt <= 0;
         enemy_x_i <= 20;
         enemy_y_i <= 6;
+        kill_count_i <= 0;
+        score_i <= 0;
         lfsr <= x"ACE1";
       elsif tick_en = '1' then
         shoot_evt <= '0';
@@ -228,7 +238,22 @@ begin
             if (dot_v > 0) and (dot_v <= 16) and (abs(cross_v) <= 1) then
               shoot_hit_i <= '1';
               enemy_alive_i <= '0';
-              enemy_respawn_cnt <= ENEMY_RESPAWN_TICKS;
+
+              if kill_count_i < 99 then
+                kill_count_i <= kill_count_i + 1;
+              end if;
+
+              if score_i <= 9899 then
+                score_i <= score_i + 100;
+              else
+                score_i <= 9999;
+              end if;
+
+              next_respawn := ENEMY_RESPAWN_TICKS - (kill_count_i * ENEMY_RESPAWN_STEP);
+              if next_respawn < ENEMY_RESPAWN_MIN_TICKS then
+                next_respawn := ENEMY_RESPAWN_MIN_TICKS;
+              end if;
+              enemy_respawn_cnt <= next_respawn;
             end if;
           end if;
         end if;
@@ -248,4 +273,7 @@ begin
   bullet_active <= '1' when bullet_cnt > 0 else '0';
   enemy_x_tile <= enemy_x_i;
   enemy_y_tile <= enemy_y_i;
+  kill_count <= kill_count_i;
+  score <= score_i;
+  level <= kill_count_i / 5;
 end architecture;

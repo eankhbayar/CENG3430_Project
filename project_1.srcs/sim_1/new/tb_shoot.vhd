@@ -17,6 +17,9 @@ architecture tb of tb_shoot is
   signal enemy_alive, bullet_active : std_logic;
   signal enemy_x_tile : integer range 0 to MAP_W - 1;
   signal enemy_y_tile : integer range 0 to MAP_H - 1;
+  signal kills : integer range 0 to 99;
+  signal score : integer range 0 to 9999;
+  signal level : integer range 0 to 9;
   signal done : boolean := false;
 begin
   clk <= not clk after 5 ns when not done else '0';
@@ -45,7 +48,10 @@ begin
       enemy_alive => enemy_alive,
       bullet_active => bullet_active,
       enemy_x_tile => enemy_x_tile,
-      enemy_y_tile => enemy_y_tile
+      enemy_y_tile => enemy_y_tile,
+      kill_count => kills,
+      score => score,
+      level => level
     );
 
   stim : process
@@ -82,6 +88,9 @@ begin
     assert bullet_active = '1' or bullet_active = '0' report "bullet_active unknown" severity failure;
     assert enemy_x_tile >= 0 and enemy_x_tile < MAP_W report "Enemy X tile out of bounds" severity failure;
     assert enemy_y_tile >= 0 and enemy_y_tile < MAP_H report "Enemy Y tile out of bounds" severity failure;
+    assert kills >= 0 and kills <= 99 report "Kill counter out of range" severity failure;
+    assert score >= 0 and score <= 9999 report "Score out of range" severity failure;
+    assert level >= 0 and level <= 9 report "Level out of range" severity failure;
 
     done <= true;
     report "tb_shoot passed" severity note;

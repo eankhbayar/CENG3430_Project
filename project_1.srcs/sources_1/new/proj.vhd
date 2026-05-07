@@ -28,8 +28,43 @@ architecture rtl of proj is
   constant MINIMAP_W_PX : integer := MAP_W * MINIMAP_SCALE;
   constant MINIMAP_H_PX : integer := MAP_H * MINIMAP_SCALE;
 
+  constant DIGIT_W : integer := 14;
+  constant DIGIT_H : integer := 24;
+  constant HUD_Y : integer := 8;
+
   type int_array_t is array (0 to SAMPLE_W - 1) of integer range 0 to SCREEN_H - 1;
   type rgb_array_t is array (0 to SAMPLE_W - 1) of std_logic_vector(11 downto 0);
+
+  function seg_lit(d : integer; s : integer) return boolean is
+  begin
+    case d is
+      when 0 => return (s = 0) or (s = 1) or (s = 2) or (s = 3) or (s = 4) or (s = 5);
+      when 1 => return (s = 1) or (s = 2);
+      when 2 => return (s = 0) or (s = 1) or (s = 6) or (s = 4) or (s = 3);
+      when 3 => return (s = 0) or (s = 1) or (s = 6) or (s = 2) or (s = 3);
+      when 4 => return (s = 5) or (s = 6) or (s = 1) or (s = 2);
+      when 5 => return (s = 0) or (s = 5) or (s = 6) or (s = 2) or (s = 3);
+      when 6 => return (s = 0) or (s = 5) or (s = 6) or (s = 2) or (s = 3) or (s = 4);
+      when 7 => return (s = 0) or (s = 1) or (s = 2);
+      when 8 => return true;
+      when 9 => return (s = 0) or (s = 1) or (s = 2) or (s = 3) or (s = 5) or (s = 6);
+      when others => return false;
+    end case;
+  end function;
+
+  function digit_pixel(d : integer; lx : integer; ly : integer) return boolean is
+  begin
+    if (seg_lit(d, 0) and (ly <= 1) and (lx >= 2) and (lx <= 11)) or
+       (seg_lit(d, 1) and (lx >= 12) and (ly >= 2) and (ly <= 10)) or
+       (seg_lit(d, 2) and (lx >= 12) and (ly >= 12) and (ly <= 20)) or
+       (seg_lit(d, 3) and (ly >= 22) and (lx >= 2) and (lx <= 11)) or
+       (seg_lit(d, 4) and (lx <= 1) and (ly >= 12) and (ly <= 20)) or
+       (seg_lit(d, 5) and (lx <= 1) and (ly >= 2) and (ly <= 10)) or
+       (seg_lit(d, 6) and (ly >= 10) and (ly <= 13) and (lx >= 2) and (lx <= 11)) then
+      return true;
+    end if;
+    return false;
+  end function;
 
   signal clk_pix : std_logic;
   signal rst : std_logic := '0';
@@ -49,6 +84,9 @@ architecture rtl of proj is
   signal bullet_active : std_logic;
   signal enemy_x_tile : integer range 0 to MAP_W - 1;
   signal enemy_y_tile : integer range 0 to MAP_H - 1;
+  signal kill_count : integer range 0 to 99;
+  signal score : integer range 0 to 9999;
+  signal level : integer range 0 to 9;
 
   signal ray_start : std_logic := '0';
   signal ray_busy : std_logic;
@@ -69,6 +107,13 @@ architecture rtl of proj is
   signal enemy_visible_frame : std_logic := '0';
   signal enemy_screen_x_frame : integer range 0 to SCREEN_W - 1 := SCREEN_W / 2;
   signal enemy_size_frame : integer range 12 to 120 := 48;
+
+  signal score_d3 : integer range 0 to 9 := 0;
+  signal score_d2 : integer range 0 to 9 := 0;
+  signal score_d1 : integer range 0 to 9 := 0;
+  signal score_d0 : integer range 0 to 9 := 0;
+  signal kills_d1 : integer range 0 to 9 := 0;
+  signal kills_d0 : integer range 0 to 9 := 0;
 
   signal rgb : std_logic_vector(11 downto 0) := (others => '0');
 begin
@@ -116,7 +161,10 @@ begin
       enemy_alive => enemy_alive,
       bullet_active => bullet_active,
       enemy_x_tile => enemy_x_tile,
-      enemy_y_tile => enemy_y_tile
+      enemy_y_tile => enemy_y_tile,
+      kill_count => kill_count,
+      score => score,
+      level => level
     );
 
   ray_i : entity work.raycaster_core
@@ -162,6 +210,13 @@ begin
         player_y_frame <= player_y_fp;
         heading_frame <= heading_idx;
         ray_start <= '1';
+
+        score_d3 <= (score / 1000) mod 10;
+        score_d2 <= (score / 100) mod 10;
+        score_d1 <= (score / 10) mod 10;
+        score_d0 <= score mod 10;
+        kills_d1 <= (kill_count / 10) mod 10;
+        kills_d0 <= kill_count mod 10;
 
         player_tile_x := player_x_fp / TILE_SIZE_FP;
         player_tile_y := player_y_fp / TILE_SIZE_FP;
@@ -231,6 +286,8 @@ begin
     variable pov_dy : integer;
     variable body_top : integer;
     variable body_bot : integer;
+    variable lx : integer;
+    variable ly : integer;
   begin
     if rising_edge(clk_pix) then
       if vga_active = '1' then
@@ -318,6 +375,34 @@ begin
 
           if (pix_x = 0) or (pix_y = 0) or (pix_x = MINIMAP_W_PX - 1) or (pix_y = MINIMAP_H_PX - 1) then
             c := x"FFF";
+          end if;
+        end if;
+
+        -- Score digits (top-right)
+        if (pix_y >= HUD_Y) and (pix_y < HUD_Y + DIGIT_H) then
+          if (pix_x >= 500) and (pix_x < 500 + DIGIT_W) then
+            lx := pix_x - 500; ly := pix_y - HUD_Y;
+            if digit_pixel(score_d3, lx, ly) then c := x"FF0"; end if;
+          elsif (pix_x >= 516) and (pix_x < 516 + DIGIT_W) then
+            lx := pix_x - 516; ly := pix_y - HUD_Y;
+            if digit_pixel(score_d2, lx, ly) then c := x"FF0"; end if;
+          elsif (pix_x >= 532) and (pix_x < 532 + DIGIT_W) then
+            lx := pix_x - 532; ly := pix_y - HUD_Y;
+            if digit_pixel(score_d1, lx, ly) then c := x"FF0"; end if;
+          elsif (pix_x >= 548) and (pix_x < 548 + DIGIT_W) then
+            lx := pix_x - 548; ly := pix_y - HUD_Y;
+            if digit_pixel(score_d0, lx, ly) then c := x"FF0"; end if;
+          end if;
+
+          if (pix_x >= 576) and (pix_x < 576 + DIGIT_W) then
+            lx := pix_x - 576; ly := pix_y - HUD_Y;
+            if digit_pixel(kills_d1, lx, ly) then c := x"0FF"; end if;
+          elsif (pix_x >= 592) and (pix_x < 592 + DIGIT_W) then
+            lx := pix_x - 592; ly := pix_y - HUD_Y;
+            if digit_pixel(kills_d0, lx, ly) then c := x"0FF"; end if;
+          elsif (pix_x >= 620) and (pix_x < 620 + DIGIT_W) then
+            lx := pix_x - 620; ly := pix_y - HUD_Y;
+            if digit_pixel(level, lx, ly) then c := x"F0F"; end if;
           end if;
         end if;
 

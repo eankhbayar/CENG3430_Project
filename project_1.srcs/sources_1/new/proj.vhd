@@ -246,20 +246,27 @@ begin
           body_top := 240 - enemy_size_frame;
           body_bot := 240 + enemy_size_frame;
 
-          if (pix_x >= enemy_screen_x_frame - (enemy_size_frame / 4)) and
-             (pix_x <= enemy_screen_x_frame + (enemy_size_frame / 4)) and
+          -- Black stickman (head, torso, hands, legs)
+          if (pix_x >= enemy_screen_x_frame - (enemy_size_frame / 5)) and
+             (pix_x <= enemy_screen_x_frame + (enemy_size_frame / 5)) and
              (pix_y >= body_top + (enemy_size_frame / 2)) and
              (pix_y <= body_bot) then
-            c := x"0F0";
-          elsif (pix_x >= enemy_screen_x_frame - (enemy_size_frame / 3)) and
-                (pix_x <= enemy_screen_x_frame + (enemy_size_frame / 3)) and
+            c := x"000";
+          elsif (pix_x >= enemy_screen_x_frame - (enemy_size_frame / 4)) and
+                (pix_x <= enemy_screen_x_frame + (enemy_size_frame / 4)) and
                 (pix_y >= body_top) and
                 (pix_y <= body_top + (enemy_size_frame / 3)) then
-            c := x"0F0";
+            c := x"000";
           elsif (pix_y = body_top + (enemy_size_frame / 2)) and
                 (pix_x >= enemy_screen_x_frame - (enemy_size_frame / 2)) and
                 (pix_x <= enemy_screen_x_frame + (enemy_size_frame / 2)) then
-            c := x"0F0";
+            c := x"000";
+          elsif ((pix_x - enemy_screen_x_frame) = (pix_y - (body_top + (enemy_size_frame * 3 / 4)))) and
+                (pix_y >= body_top + (enemy_size_frame * 3 / 4)) and (pix_y <= body_bot) then
+            c := x"000";
+          elsif ((enemy_screen_x_frame - pix_x) = (pix_y - (body_top + (enemy_size_frame * 3 / 4)))) and
+                (pix_y >= body_top + (enemy_size_frame * 3 / 4)) and (pix_y <= body_bot) then
+            c := x"000";
           end if;
         end if;
 

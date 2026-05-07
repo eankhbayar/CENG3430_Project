@@ -33,6 +33,7 @@ architecture rtl of game_state is
   constant TICK_DIV : integer := CLK_HZ / TICK_HZ;
   constant ENEMY_TILE_X : integer := 20;
   constant ENEMY_TILE_Y : integer := 6;
+  constant ENEMY_RESPAWN_TICKS : integer := 360;
 
   signal tick_counter : integer range 0 to TICK_DIV - 1 := 0;
   signal tick_en : std_logic := '0';
@@ -51,6 +52,7 @@ architecture rtl of game_state is
   signal shoot_evt : std_logic := '0';
   signal shoot_hit_i : std_logic := '0';
   signal enemy_alive_i : std_logic := '1';
+  signal enemy_respawn_cnt : integer range 0 to ENEMY_RESPAWN_TICKS := 0;
 begin
   process(clk)
   begin
@@ -94,6 +96,7 @@ begin
         shoot_evt <= '0';
         shoot_hit_i <= '0';
         enemy_alive_i <= '1';
+        enemy_respawn_cnt <= 0;
       elsif tick_en = '1' then
         shoot_evt <= '0';
         shoot_hit_i <= '0';
@@ -153,6 +156,14 @@ begin
           bullet_cnt <= bullet_cnt - 1;
         end if;
 
+        if enemy_alive_i = '0' then
+          if enemy_respawn_cnt > 0 then
+            enemy_respawn_cnt <= enemy_respawn_cnt - 1;
+          else
+            enemy_alive_i <= '1';
+          end if;
+        end if;
+
         if (btnc = '1') and (btnc_d = '0') and (cooldown = 0) then
           shoot_evt <= '1';
           cooldown <= SHOOT_COOLDOWN_TICKS;
@@ -184,6 +195,7 @@ begin
             if (dot_v > 0) and (dot_v <= 12) and (abs(cross_v) <= 1) then
               shoot_hit_i <= '1';
               enemy_alive_i <= '0';
+              enemy_respawn_cnt <= ENEMY_RESPAWN_TICKS;
             end if;
           end if;
         end if;

@@ -62,46 +62,18 @@ package body raycast_pkg is
       return true;
     end if;
 
-    -- De_cache-inspired flat layout (stylized for low-resource FPGA logic)
-    -- Mid warehouse block with four doorway cuts.
-    if (tile_x >= 9) and (tile_x <= 14) and (tile_y >= 9) and (tile_y <= 14) and
-       not (((tile_x = 11) or (tile_x = 12)) and (tile_y = 9)) and
-       not (((tile_x = 11) or (tile_x = 12)) and (tile_y = 14)) and
-       not (((tile_y = 11) or (tile_y = 12)) and (tile_x = 9)) and
-       not (((tile_y = 11) or (tile_y = 12)) and (tile_x = 14)) then
+    -- Simple arena-style layout for faster readability/gameplay.
+    if (tile_x = 12) and (tile_y > 3) and (tile_y < 20) then
       return true;
-
-    -- A site (upper-right): heavy cover and lane split.
-    elsif (tile_x >= 18) and (tile_x <= 22) and (tile_y >= 2) and (tile_y <= 4) then
+    elsif (tile_y = 12) and (tile_x > 3) and (tile_x < 20) then
       return true;
-    elsif (tile_x >= 19) and (tile_x <= 21) and (tile_y = 7) then
+    elsif (tile_x = 6) and (tile_y >= 6) and (tile_y <= 17) then
       return true;
-    elsif (tile_x = 17) and (tile_y >= 3) and (tile_y <= 9) and not (tile_y = 6) then
+    elsif (tile_y = 17) and (tile_x >= 6) and (tile_x <= 17) then
       return true;
-
-    -- B site (lower-right): back wall with checker cover.
-    elsif (tile_x >= 18) and (tile_x <= 22) and (tile_y >= 18) and (tile_y <= 21) then
+    elsif (tile_x >= 18) and (tile_x <= 21) and (tile_y >= 5) and (tile_y <= 8) then
       return true;
-    elsif (tile_x >= 16) and (tile_x <= 20) and (tile_y = 16) and not ((tile_x = 18) or (tile_x = 19)) then
-      return true;
-
-    -- Mid connectors and choke walls.
-    elsif (tile_x = 7) and (tile_y >= 4) and (tile_y <= 18) and
-          not ((tile_y >= 10) and (tile_y <= 12)) then
-      return true;
-    elsif (tile_y = 6) and (tile_x >= 4) and (tile_x <= 16) and
-          not ((tile_x >= 10) and (tile_x <= 12)) then
-      return true;
-    elsif (tile_y = 17) and (tile_x >= 5) and (tile_x <= 16) and
-          not ((tile_x >= 8) and (tile_x <= 10)) then
-      return true;
-
-    -- T-side obstacles (lower-left) to prove map structure on minimap.
-    elsif (tile_x >= 2) and (tile_x <= 4) and (tile_y >= 19) and (tile_y <= 21) then
-      return true;
-    elsif (tile_x = 5) and (tile_y >= 15) and (tile_y <= 18) then
-      return true;
-    elsif (tile_x >= 2) and (tile_x <= 6) and (tile_y = 14) and not (tile_x = 4) then
+    elsif (tile_x >= 3) and (tile_x <= 5) and (tile_y >= 18) and (tile_y <= 21) then
       return true;
     else
       return false;

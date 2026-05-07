@@ -25,14 +25,14 @@ entity game_state is
     shoot_hit : out std_logic;
     muzzle_flash : out std_logic;
     enemy_alive : out std_logic;
-    bullet_active : out std_logic
+    bullet_active : out std_logic;
+    enemy_x_tile : out integer range 0 to MAP_W - 1;
+    enemy_y_tile : out integer range 0 to MAP_H - 1
   );
 end entity;
 
 architecture rtl of game_state is
   constant TICK_DIV : integer := CLK_HZ / TICK_HZ;
-  constant ENEMY_TILE_X : integer := 20;
-  constant ENEMY_TILE_Y : integer := 6;
   constant ENEMY_RESPAWN_TICKS : integer := 360;
 
   signal tick_counter : integer range 0 to TICK_DIV - 1 := 0;
@@ -53,6 +53,9 @@ architecture rtl of game_state is
   signal shoot_hit_i : std_logic := '0';
   signal enemy_alive_i : std_logic := '1';
   signal enemy_respawn_cnt : integer range 0 to ENEMY_RESPAWN_TICKS := 0;
+  signal enemy_x_i : integer range 0 to MAP_W - 1 := 20;
+  signal enemy_y_i : integer range 0 to MAP_H - 1 := 6;
+  signal lfsr : std_logic_vector(15 downto 0) := x"ACE1";
 begin
   process(clk)
   begin
@@ -82,6 +85,10 @@ begin
     variable enemy_vec_y : integer;
     variable dot_v : integer;
     variable cross_v : integer;
+    variable spawn_sel : integer;
+    variable spawn_x : integer;
+    variable spawn_y : integer;
+    variable lfsr_n : std_logic_vector(15 downto 0);
   begin
     if rising_edge(clk) then
       if rst = '1' then
@@ -97,9 +104,15 @@ begin
         shoot_hit_i <= '0';
         enemy_alive_i <= '1';
         enemy_respawn_cnt <= 0;
+        enemy_x_i <= 20;
+        enemy_y_i <= 6;
+        lfsr <= x"ACE1";
       elsif tick_en = '1' then
         shoot_evt <= '0';
         shoot_hit_i <= '0';
+
+        lfsr_n := lfsr(14 downto 0) & (lfsr(15) xor lfsr(13) xor lfsr(12) xor lfsr(10));
+        lfsr <= lfsr_n;
 
         if btnl = '1' and btnr = '0' then
           if turn_delay = 0 then
@@ -160,7 +173,27 @@ begin
           if enemy_respawn_cnt > 0 then
             enemy_respawn_cnt <= enemy_respawn_cnt - 1;
           else
-            enemy_alive_i <= '1';
+            spawn_sel := to_integer(unsigned(lfsr_n(2 downto 0)));
+            case spawn_sel is
+              when 0 => spawn_x := 25; spawn_y := 6;
+              when 1 => spawn_x := 26; spawn_y := 20;
+              when 2 => spawn_x := 6;  spawn_y := 26;
+              when 3 => spawn_x := 20; spawn_y := 9;
+              when 4 => spawn_x := 28; spawn_y := 14;
+              when 5 => spawn_x := 12; spawn_y := 28;
+              when 6 => spawn_x := 4;  spawn_y := 20;
+              when others => spawn_x := 22; spawn_y := 4;
+            end case;
+
+            if not map_is_wall(spawn_x, spawn_y) then
+              enemy_x_i <= spawn_x;
+              enemy_y_i <= spawn_y;
+              enemy_alive_i <= '1';
+            else
+              enemy_x_i <= 20;
+              enemy_y_i <= 6;
+              enemy_alive_i <= '1';
+            end if;
           end if;
         end if;
 
@@ -174,8 +207,8 @@ begin
             tx := p_x_fp / TILE_SIZE_FP;
             ty := p_y_fp / TILE_SIZE_FP;
 
-            enemy_vec_x := ENEMY_TILE_X - tx;
-            enemy_vec_y := ENEMY_TILE_Y - ty;
+            enemy_vec_x := enemy_x_i - tx;
+            enemy_vec_y := enemy_y_i - ty;
 
             dir_code := head_i / 2;
             case dir_code is
@@ -192,7 +225,7 @@ begin
             dot_v := enemy_vec_x * look_dx + enemy_vec_y * look_dy;
             cross_v := enemy_vec_x * look_dy - enemy_vec_y * look_dx;
 
-            if (dot_v > 0) and (dot_v <= 12) and (abs(cross_v) <= 1) then
+            if (dot_v > 0) and (dot_v <= 16) and (abs(cross_v) <= 1) then
               shoot_hit_i <= '1';
               enemy_alive_i <= '0';
               enemy_respawn_cnt <= ENEMY_RESPAWN_TICKS;
@@ -213,4 +246,6 @@ begin
   muzzle_flash <= '1' when flash_cnt > 0 else '0';
   enemy_alive <= enemy_alive_i;
   bullet_active <= '1' when bullet_cnt > 0 else '0';
+  enemy_x_tile <= enemy_x_i;
+  enemy_y_tile <= enemy_y_i;
 end architecture;

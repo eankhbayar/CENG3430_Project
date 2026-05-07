@@ -7,8 +7,8 @@ package raycast_pkg is
   constant FP_ONE   : integer := 2 ** FP_SHIFT;
   constant TILE_SHIFT : integer := 8;
   constant TILE_SIZE_FP : integer := 2 ** TILE_SHIFT;
-  constant MAP_W : integer := 24;
-  constant MAP_H : integer := 24;
+  constant MAP_W : integer := 32;
+  constant MAP_H : integer := 32;
 
   subtype heading_t is integer range 0 to 15;
 
@@ -63,17 +63,17 @@ package body raycast_pkg is
     end if;
 
     -- Simple arena-style layout for faster readability/gameplay.
-    if (tile_x = 12) and (tile_y > 3) and (tile_y < 20) then
+    if (tile_x = 16) and (tile_y > 4) and (tile_y < 27) then
       return true;
-    elsif (tile_y = 12) and (tile_x > 3) and (tile_x < 20) then
+    elsif (tile_y = 16) and (tile_x > 4) and (tile_x < 27) then
       return true;
-    elsif (tile_x = 6) and (tile_y >= 6) and (tile_y <= 17) then
+    elsif (tile_x = 8) and (tile_y >= 8) and (tile_y <= 23) then
       return true;
-    elsif (tile_y = 17) and (tile_x >= 6) and (tile_x <= 17) then
+    elsif (tile_y = 24) and (tile_x >= 8) and (tile_x <= 24) then
       return true;
-    elsif (tile_x >= 18) and (tile_x <= 21) and (tile_y >= 5) and (tile_y <= 8) then
+    elsif (tile_x >= 24) and (tile_x <= 28) and (tile_y >= 6) and (tile_y <= 10) then
       return true;
-    elsif (tile_x >= 3) and (tile_x <= 5) and (tile_y >= 18) and (tile_y <= 21) then
+    elsif (tile_x >= 4) and (tile_x <= 7) and (tile_y >= 24) and (tile_y <= 28) then
       return true;
     else
       return false;

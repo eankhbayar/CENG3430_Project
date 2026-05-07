@@ -27,8 +27,6 @@ architecture rtl of proj is
   constant MINIMAP_SCALE : integer := 4;
   constant MINIMAP_W_PX : integer := MAP_W * MINIMAP_SCALE;
   constant MINIMAP_H_PX : integer := MAP_H * MINIMAP_SCALE;
-  constant ENEMY_TILE_X : integer := 20;
-  constant ENEMY_TILE_Y : integer := 6;
 
   type int_array_t is array (0 to SAMPLE_W - 1) of integer range 0 to SCREEN_H - 1;
   type rgb_array_t is array (0 to SAMPLE_W - 1) of std_logic_vector(11 downto 0);
@@ -49,6 +47,8 @@ architecture rtl of proj is
   signal muzzle_flash : std_logic;
   signal enemy_alive : std_logic;
   signal bullet_active : std_logic;
+  signal enemy_x_tile : integer range 0 to MAP_W - 1;
+  signal enemy_y_tile : integer range 0 to MAP_H - 1;
 
   signal ray_start : std_logic := '0';
   signal ray_busy : std_logic;
@@ -114,7 +114,9 @@ begin
       shoot_hit => shoot_hit,
       muzzle_flash => muzzle_flash,
       enemy_alive => enemy_alive,
-      bullet_active => bullet_active
+      bullet_active => bullet_active,
+      enemy_x_tile => enemy_x_tile,
+      enemy_y_tile => enemy_y_tile
     );
 
   ray_i : entity work.raycaster_core
@@ -163,8 +165,8 @@ begin
 
         player_tile_x := player_x_fp / TILE_SIZE_FP;
         player_tile_y := player_y_fp / TILE_SIZE_FP;
-        enemy_vec_x := ENEMY_TILE_X - player_tile_x;
-        enemy_vec_y := ENEMY_TILE_Y - player_tile_y;
+        enemy_vec_x := enemy_x_tile - player_tile_x;
+        enemy_vec_y := enemy_y_tile - player_tile_y;
 
         dir_code := heading_idx / 2;
         case dir_code is
@@ -181,9 +183,9 @@ begin
         dot_v := enemy_vec_x * look_dx + enemy_vec_y * look_dy;
         cross_v := enemy_vec_x * look_dy - enemy_vec_y * look_dx;
 
-        if (enemy_alive = '1') and (dot_v > 0) and (dot_v <= 14) and (abs(cross_v) <= dot_v + 1) then
+        if (enemy_alive = '1') and (dot_v > 0) and (dot_v <= 16) and (abs(cross_v) <= dot_v + 1) then
           enemy_visible_frame <= '1';
-          sx := (SCREEN_W / 2) + (cross_v * 22);
+          sx := (SCREEN_W / 2) + (cross_v * 20);
           if sx < 40 then
             enemy_screen_x_frame <= 40;
           elsif sx > SCREEN_W - 40 then
@@ -246,7 +248,6 @@ begin
           body_top := 240 - enemy_size_frame;
           body_bot := 240 + enemy_size_frame;
 
-          -- Black stickman (head, torso, hands, legs)
           if (pix_x >= enemy_screen_x_frame - (enemy_size_frame / 5)) and
              (pix_x <= enemy_screen_x_frame + (enemy_size_frame / 5)) and
              (pix_y >= body_top + (enemy_size_frame / 2)) and
@@ -305,7 +306,7 @@ begin
             c := x"062";
           end if;
 
-          if (enemy_alive = '1') and (map_tile_x = ENEMY_TILE_X) and (map_tile_y = ENEMY_TILE_Y) then
+          if (enemy_alive = '1') and (map_tile_x = enemy_x_tile) and (map_tile_y = enemy_y_tile) then
             c := x"0FF";
           end if;
 

@@ -225,21 +225,57 @@ begin
             if dist_v < 2 then
               slice_h := SCREEN_H - 18;
               color_v := x"FD4";
-            elsif dist_v < 4 then
+            elsif dist_v = 2 then
+              slice_h := (SCREEN_H * 5) / 6;
+              color_v := x"EC4";
+            elsif dist_v = 3 then
               slice_h := (SCREEN_H * 3) / 4;
               color_v := x"DA3";
-            elsif dist_v < 7 then
-              slice_h := SCREEN_H / 2;
+            elsif dist_v = 4 then
+              slice_h := (SCREEN_H * 2) / 3;
+              color_v := x"C93";
+            elsif dist_v = 5 then
+              slice_h := (SCREEN_H * 3) / 5;
               color_v := x"B82";
-            elsif dist_v < 12 then
-              slice_h := SCREEN_H / 3;
+            elsif dist_v = 6 then
+              slice_h := (SCREEN_H * 11) / 20;
+              color_v := x"A72";
+            elsif dist_v = 7 then
+              slice_h := SCREEN_H / 2;
               color_v := x"975";
-            elsif dist_v < 18 then
-              slice_h := SCREEN_H / 4;
-              color_v := x"753";
-            else
-              slice_h := SCREEN_H / 5;
+            elsif dist_v = 8 then
+              slice_h := (SCREEN_H * 9) / 20;
+              color_v := x"865";
+            elsif dist_v = 9 then
+              slice_h := (SCREEN_H * 2) / 5;
+              color_v := x"754";
+            elsif dist_v = 10 then
+              slice_h := (SCREEN_H * 7) / 20;
+              color_v := x"744";
+            elsif dist_v = 11 then
+              slice_h := SCREEN_H / 3;
+              color_v := x"643";
+            elsif dist_v = 12 then
+              slice_h := (SCREEN_H * 3) / 10;
               color_v := x"532";
+            elsif dist_v = 13 then
+              slice_h := (SCREEN_H * 11) / 40;
+              color_v := x"432";
+            elsif dist_v = 14 then
+              slice_h := SCREEN_H / 4;
+              color_v := x"421";
+            elsif dist_v = 15 then
+              slice_h := (SCREEN_H * 9) / 40;
+              color_v := x"321";
+            elsif dist_v = 16 then
+              slice_h := SCREEN_H / 5;
+              color_v := x"311";
+            elsif dist_v = 17 then
+              slice_h := (SCREEN_H * 7) / 40;
+              color_v := x"211";
+            else
+              slice_h := SCREEN_H / 6;
+              color_v := x"111";
             end if;
 
             if hit_side_reg = 1 then

@@ -36,14 +36,12 @@ package body raycast_pkg is
   );
 
   function wrap_heading(v : integer) return heading_t is
-    variable r : integer := v;
+    variable r : integer;
   begin
-    while r < 0 loop
+    r := v mod 16;
+    if r < 0 then
       r := r + 16;
-    end loop;
-    while r > 15 loop
-      r := r - 16;
-    end loop;
+    end if;
     return heading_t(r);
   end function;
 

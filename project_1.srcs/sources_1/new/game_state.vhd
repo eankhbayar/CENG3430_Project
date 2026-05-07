@@ -39,6 +39,7 @@ architecture rtl of game_state is
 
   signal cooldown : integer range 0 to SHOOT_COOLDOWN_TICKS := 0;
   signal flash_cnt : integer range 0 to 10 := 0;
+  signal turn_delay : integer range 0 to 2 := 0;
 
   signal btnc_d : std_logic := '0';
 
@@ -75,6 +76,7 @@ begin
         head_i <= 0;
         cooldown <= 0;
         flash_cnt <= 0;
+        turn_delay <= 0;
         btnc_d <= '0';
         shoot_evt <= '0';
         shoot_hit_i <= '0';
@@ -83,9 +85,21 @@ begin
         shoot_hit_i <= '0';
 
         if btnl = '1' and btnr = '0' then
-          head_i <= wrap_heading(head_i - 1);
+          if turn_delay = 0 then
+            head_i <= wrap_heading(head_i - 1);
+            turn_delay <= 2;
+          else
+            turn_delay <= turn_delay - 1;
+          end if;
         elsif btnr = '1' and btnl = '0' then
-          head_i <= wrap_heading(head_i + 1);
+          if turn_delay = 0 then
+            head_i <= wrap_heading(head_i + 1);
+            turn_delay <= 2;
+          else
+            turn_delay <= turn_delay - 1;
+          end if;
+        else
+          turn_delay <= 0;
         end if;
 
         dirx := dir_x(head_i);

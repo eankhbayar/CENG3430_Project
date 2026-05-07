@@ -1,6 +1,7 @@
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
+use work.raycast_pkg.ALL;
 
 entity proj is
   Port (
@@ -23,6 +24,9 @@ architecture rtl of proj is
   constant SCREEN_H : integer := 480;
   constant COLUMN_SCALE : integer := 8;
   constant SAMPLE_W : integer := SCREEN_W / COLUMN_SCALE;
+  constant MINIMAP_SCALE : integer := 4;
+  constant MINIMAP_W_PX : integer := MAP_W * MINIMAP_SCALE;
+  constant MINIMAP_H_PX : integer := MAP_H * MINIMAP_SCALE;
 
   type int_array_t is array (0 to SAMPLE_W - 1) of integer range 0 to SCREEN_H - 1;
   type rgb_array_t is array (0 to SAMPLE_W - 1) of std_logic_vector(11 downto 0);
@@ -149,6 +153,13 @@ begin
   process(clk_pix)
     variable c : std_logic_vector(11 downto 0);
     variable sample_col : integer range 0 to SAMPLE_W - 1;
+    variable map_tile_x : integer;
+    variable map_tile_y : integer;
+    variable player_tile_x : integer;
+    variable player_tile_y : integer;
+    variable heading_code : integer;
+    variable pov_dx : integer;
+    variable pov_dy : integer;
   begin
     if rising_edge(clk_pix) then
       if vga_active = '1' then
@@ -160,6 +171,40 @@ begin
           c := wall_color_buf(sample_col);
         else
           c := x"242";
+        end if;
+        if (pix_x < MINIMAP_W_PX) and (pix_y < MINIMAP_H_PX) then
+          map_tile_x := pix_x / MINIMAP_SCALE;
+          map_tile_y := pix_y / MINIMAP_SCALE;
+          player_tile_x := player_x_fp / TILE_SIZE_FP;
+          player_tile_y := player_y_fp / TILE_SIZE_FP;
+          heading_code := heading_idx / 2;
+
+          case heading_code is
+            when 0 => pov_dx := 1;  pov_dy := 0;
+            when 1 => pov_dx := 1;  pov_dy := 1;
+            when 2 => pov_dx := 0;  pov_dy := 1;
+            when 3 => pov_dx := -1; pov_dy := 1;
+            when 4 => pov_dx := -1; pov_dy := 0;
+            when 5 => pov_dx := -1; pov_dy := -1;
+            when 6 => pov_dx := 0;  pov_dy := -1;
+            when others => pov_dx := 1; pov_dy := -1;
+          end case;
+
+          if map_is_wall(map_tile_x, map_tile_y) then
+            c := x"333";
+          else
+            c := x"062";
+          end if;
+
+          if (map_tile_x = player_tile_x) and (map_tile_y = player_tile_y) then
+            c := x"FFF";
+          elsif (map_tile_x = player_tile_x + pov_dx) and (map_tile_y = player_tile_y + pov_dy) then
+            c := x"F00";
+          end if;
+
+          if (pix_x = 0) or (pix_y = 0) or (pix_x = MINIMAP_W_PX - 1) or (pix_y = MINIMAP_H_PX - 1) then
+            c := x"FFF";
+          end if;
         end if;
 
         if ((pix_x >= 316 and pix_x <= 324) and (pix_y = 240)) or

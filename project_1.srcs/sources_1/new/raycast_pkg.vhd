@@ -7,8 +7,8 @@ package raycast_pkg is
   constant FP_ONE   : integer := 2 ** FP_SHIFT;
   constant TILE_SHIFT : integer := 8;
   constant TILE_SIZE_FP : integer := 2 ** TILE_SHIFT;
-  constant MAP_W : integer := 16;
-  constant MAP_H : integer := 16;
+  constant MAP_W : integer := 24;
+  constant MAP_H : integer := 24;
 
   subtype heading_t is integer range 0 to 15;
 
@@ -62,13 +62,13 @@ package body raycast_pkg is
       return true;
     end if;
 
-    if (tile_x = 8) and (tile_y > 2) and (tile_y < 13) then
+    if (tile_x = 12) and (tile_y > 3) and (tile_y < 20) then
       return true;
-    elsif (tile_y = 8) and (tile_x > 2) and (tile_x < 13) then
+    elsif (tile_y = 12) and (tile_x > 3) and (tile_x < 20) then
       return true;
-    elsif (tile_x = 4) and (tile_y >= 4) and (tile_y <= 11) then
+    elsif (tile_x = 6) and (tile_y >= 6) and (tile_y <= 17) then
       return true;
-    elsif (tile_y = 11) and (tile_x >= 4) and (tile_x <= 11) then
+    elsif (tile_y = 17) and (tile_x >= 6) and (tile_x <= 17) then
       return true;
     else
       return false;

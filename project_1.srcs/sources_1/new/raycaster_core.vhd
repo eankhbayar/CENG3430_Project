@@ -98,16 +98,20 @@ begin
             end if;
 
           when S_INIT_COL =>
-            if (col_reg * 5) < (SAMPLE_W * 1) then
+            if (col_reg * 7) < (SAMPLE_W * 1) then
+              heading_ofs := -3;
+            elsif (col_reg * 7) < (SAMPLE_W * 2) then
               heading_ofs := -2;
-            elsif (col_reg * 5) < (SAMPLE_W * 2) then
+            elsif (col_reg * 7) < (SAMPLE_W * 3) then
               heading_ofs := -1;
-            elsif (col_reg * 5) < (SAMPLE_W * 3) then
+            elsif (col_reg * 7) < (SAMPLE_W * 4) then
               heading_ofs := 0;
-            elsif (col_reg * 5) < (SAMPLE_W * 4) then
+            elsif (col_reg * 7) < (SAMPLE_W * 5) then
               heading_ofs := 1;
-            else
+            elsif (col_reg * 7) < (SAMPLE_W * 6) then
               heading_ofs := 2;
+            else
+              heading_ofs := 3;
             end if;
 
             ray_heading := wrap_heading(head_reg + heading_ofs);

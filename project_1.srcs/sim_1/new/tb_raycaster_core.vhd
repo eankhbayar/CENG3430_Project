@@ -2,62 +2,77 @@ library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 use std.env.all;
-use work.raycast_pkg.ALL;
 
 entity tb_raycaster_core is
 end entity;
 
 architecture tb of tb_raycaster_core is
+  constant SCREEN_W_TB : integer := 32;
+  constant SCREEN_H_TB : integer := 120;
+
   signal clk : std_logic := '0';
   signal rst : std_logic := '1';
-  signal calc_en : std_logic := '0';
-  signal column_idx : integer range 0 to 639 := 0;
-  signal wall_top : integer range 0 to 479;
-  signal wall_bottom : integer range 0 to 479;
+  signal start : std_logic := '0';
+
+  signal write_en : std_logic;
+  signal write_column : integer range 0 to SCREEN_W_TB - 1;
+  signal wall_top : integer range 0 to SCREEN_H_TB - 1;
+  signal wall_bottom : integer range 0 to SCREEN_H_TB - 1;
   signal wall_color : std_logic_vector(11 downto 0);
-  signal valid : std_logic;
+  signal busy : std_logic;
+  signal frame_done : std_logic;
 
   signal done : boolean := false;
 begin
   clk <= not clk after 10 ns when not done else '0';
 
   dut : entity work.raycaster_core
+    generic map (
+      SCREEN_W => SCREEN_W_TB,
+      SCREEN_H => SCREEN_H_TB
+    )
     port map (
       clk => clk,
       rst => rst,
-      calc_en => calc_en,
-      column_idx => column_idx,
-      player_x_fp => (3 * TILE_SIZE_FP) + (TILE_SIZE_FP / 2),
-      player_y_fp => (3 * TILE_SIZE_FP) + (TILE_SIZE_FP / 2),
+      start => start,
+      player_x_fp => 3 * 256 + 128,
+      player_y_fp => 3 * 256 + 128,
       heading_idx => 0,
+      write_en => write_en,
+      write_column => write_column,
       wall_top => wall_top,
       wall_bottom => wall_bottom,
       wall_color => wall_color,
-      valid => valid
+      busy => busy,
+      frame_done => frame_done
     );
 
   stim : process
-    variable d_center, d_left, d_right : integer;
+    variable writes_seen : integer := 0;
+    variable nonzero_color_seen : boolean := false;
   begin
     wait for 60 ns;
     rst <= '0';
 
-    d_left := cast_ray_distance_fp((3 * TILE_SIZE_FP) + (TILE_SIZE_FP / 2), (3 * TILE_SIZE_FP) + (TILE_SIZE_FP / 2), 0, 64, 640);
-    d_center := cast_ray_distance_fp((3 * TILE_SIZE_FP) + (TILE_SIZE_FP / 2), (3 * TILE_SIZE_FP) + (TILE_SIZE_FP / 2), 0, 320, 640);
-    d_right := cast_ray_distance_fp((3 * TILE_SIZE_FP) + (TILE_SIZE_FP / 2), (3 * TILE_SIZE_FP) + (TILE_SIZE_FP / 2), 0, 576, 640);
-
-    assert d_center > 0 report "Center ray did not hit" severity failure;
-    assert d_left > 0 and d_right > 0 report "Side rays did not hit" severity failure;
-
-    column_idx <= 320;
-    calc_en <= '1';
     wait until rising_edge(clk);
-    calc_en <= '0';
-
+    start <= '1';
     wait until rising_edge(clk);
-    assert valid = '1' report "Raycaster did not assert valid" severity failure;
-    assert wall_bottom > wall_top report "Invalid wall slice bounds" severity failure;
-    assert wall_color /= x"000" report "Wall color unexpectedly black" severity failure;
+    start <= '0';
+
+    while frame_done = '0' loop
+      wait until rising_edge(clk);
+      if write_en = '1' then
+        writes_seen := writes_seen + 1;
+        assert wall_bottom > wall_top report "Invalid wall slice bounds" severity failure;
+        if wall_color /= x"000" then
+          nonzero_color_seen := true;
+        end if;
+      end if;
+    end loop;
+
+    assert writes_seen = SCREEN_W_TB report "Did not produce one write per column" severity failure;
+    assert nonzero_color_seen report "Wall color unexpectedly black" severity failure;
+    assert busy = '0' report "Raycaster remained busy after frame completion" severity failure;
 
     done <= true;
     report "tb_raycaster_core passed" severity note;

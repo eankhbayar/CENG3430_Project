@@ -32,7 +32,6 @@ architecture rtl of proj is
   signal pix_x : integer range 0 to SCREEN_W - 1;
   signal pix_y : integer range 0 to SCREEN_H - 1;
   signal frame_start : std_logic;
-  signal line_start : std_logic;
 
   signal player_x_fp : integer;
   signal player_y_fp : integer;
@@ -41,16 +40,18 @@ architecture rtl of proj is
   signal shoot_hit : std_logic;
   signal muzzle_flash : std_logic;
 
+  signal ray_start : std_logic := '0';
+  signal ray_busy : std_logic;
+  signal ray_frame_done : std_logic;
+  signal ray_write_en : std_logic;
+  signal ray_write_col : integer range 0 to SCREEN_W - 1;
   signal wall_top : integer range 0 to SCREEN_H - 1;
   signal wall_bottom : integer range 0 to SCREEN_H - 1;
   signal wall_color : std_logic_vector(11 downto 0);
-  signal ray_valid : std_logic;
 
   signal wall_top_buf : int_array_t := (others => SCREEN_H / 3);
   signal wall_bottom_buf : int_array_t := (others => (2 * SCREEN_H) / 3);
   signal wall_color_buf : rgb_array_t := (others => x"753");
-
-  signal calc_en : std_logic;
 
   signal player_x_frame : integer := 0;
   signal player_y_frame : integer := 0;
@@ -75,7 +76,7 @@ begin
       x => pix_x,
       y => pix_y,
       frame_start => frame_start,
-      line_start => line_start
+      line_start => open
     );
 
   game_i : entity work.game_state
@@ -101,8 +102,6 @@ begin
       muzzle_flash => muzzle_flash
     );
 
-  calc_en <= '1' when (vga_active = '1' and pix_y = 0) else '0';
-
   ray_i : entity work.raycaster_core
     generic map (
       SCREEN_W => SCREEN_W,
@@ -111,30 +110,35 @@ begin
     port map (
       clk => clk_pix,
       rst => rst,
-      calc_en => calc_en,
-      column_idx => pix_x,
+      start => ray_start,
       player_x_fp => player_x_frame,
       player_y_fp => player_y_frame,
       heading_idx => heading_frame,
+      write_en => ray_write_en,
+      write_column => ray_write_col,
       wall_top => wall_top,
       wall_bottom => wall_bottom,
       wall_color => wall_color,
-      valid => ray_valid
+      busy => ray_busy,
+      frame_done => ray_frame_done
     );
 
   process(clk_pix)
   begin
     if rising_edge(clk_pix) then
-      if frame_start = '1' then
+      ray_start <= '0';
+
+      if frame_start = '1' and ray_busy = '0' then
         player_x_frame <= player_x_fp;
         player_y_frame <= player_y_fp;
         heading_frame <= heading_idx;
+        ray_start <= '1';
       end if;
 
-      if ray_valid = '1' then
-        wall_top_buf(pix_x) <= wall_top;
-        wall_bottom_buf(pix_x) <= wall_bottom;
-        wall_color_buf(pix_x) <= wall_color;
+      if ray_write_en = '1' then
+        wall_top_buf(ray_write_col) <= wall_top;
+        wall_bottom_buf(ray_write_col) <= wall_bottom;
+        wall_color_buf(ray_write_col) <= wall_color;
       end if;
     end if;
   end process;

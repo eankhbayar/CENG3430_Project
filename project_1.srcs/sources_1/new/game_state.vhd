@@ -67,7 +67,6 @@ begin
     variable dirx, diry : integer;
     variable n_x, n_y : integer;
     variable tx, ty : integer;
-    variable center_dist : integer;
   begin
     if rising_edge(clk) then
       if rst = '1' then
@@ -126,10 +125,7 @@ begin
           shoot_evt <= '1';
           cooldown <= SHOOT_COOLDOWN_TICKS;
           flash_cnt <= 8;
-          center_dist := cast_ray_distance_fp(p_x_fp, p_y_fp, head_i, 320, 640);
-          if center_dist < 700 then
-            shoot_hit_i <= '1';
-          end if;
+          shoot_hit_i <= '0';
         end if;
 
         btnc_d <= btnc;

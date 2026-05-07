@@ -28,7 +28,7 @@ end entity;
 
 architecture rtl of raycaster_core is
   constant SAMPLE_W : integer := SCREEN_W / COLUMN_SCALE;
-  constant MAX_STEPS : integer := 18;
+  constant MAX_STEPS : integer := 24;
 
   type state_t is (S_IDLE, S_INIT_COL, S_STEP, S_WRITE);
   signal state : state_t := S_IDLE;
@@ -98,20 +98,24 @@ begin
             end if;
 
           when S_INIT_COL =>
-            if (col_reg * 7) < (SAMPLE_W * 1) then
+            if (col_reg * 9) < (SAMPLE_W * 1) then
+              heading_ofs := -4;
+            elsif (col_reg * 9) < (SAMPLE_W * 2) then
               heading_ofs := -3;
-            elsif (col_reg * 7) < (SAMPLE_W * 2) then
+            elsif (col_reg * 9) < (SAMPLE_W * 3) then
               heading_ofs := -2;
-            elsif (col_reg * 7) < (SAMPLE_W * 3) then
+            elsif (col_reg * 9) < (SAMPLE_W * 4) then
               heading_ofs := -1;
-            elsif (col_reg * 7) < (SAMPLE_W * 4) then
+            elsif (col_reg * 9) < (SAMPLE_W * 5) then
               heading_ofs := 0;
-            elsif (col_reg * 7) < (SAMPLE_W * 5) then
+            elsif (col_reg * 9) < (SAMPLE_W * 6) then
               heading_ofs := 1;
-            elsif (col_reg * 7) < (SAMPLE_W * 6) then
+            elsif (col_reg * 9) < (SAMPLE_W * 7) then
               heading_ofs := 2;
-            else
+            elsif (col_reg * 9) < (SAMPLE_W * 8) then
               heading_ofs := 3;
+            else
+              heading_ofs := 4;
             end if;
 
             ray_heading := wrap_heading(head_reg + heading_ofs);
@@ -174,12 +178,15 @@ begin
             elsif dist_class < 7 then
               slice_h := SCREEN_H / 2;
               color_v := x"B82";
-            elsif dist_class < 11 then
+            elsif dist_class < 12 then
               slice_h := SCREEN_H / 3;
               color_v := x"975";
-            else
+            elsif dist_class < 18 then
               slice_h := SCREEN_H / 4;
               color_v := x"753";
+            else
+              slice_h := SCREEN_H / 5;
+              color_v := x"532";
             end if;
 
             if slice_h < 6 then
